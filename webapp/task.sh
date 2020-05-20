@@ -4,6 +4,7 @@ ID=$1
 test "$2" = "mgs" && TYPE="cid" || TYPE=$2
 TaskId=$3
 TAG=$4
+SYNCTYPE=$5
 IFS="," read -r -a idList <<< "$ID"
 idListLen=${#idList[@]}
 RcloneConf="rclone_1.conf"
@@ -49,7 +50,7 @@ sleepHandler() {
 
 if [[ $TaskId -eq 0 ]]; then
     NAME="$(date +"%Y-%m-%dT%H:%M:%SZ")-download_info.csv"
-    echo "id,cid,taskid,status,size,bitrate,multipart,tag,monthly" >> "$NAME"
+    echo "id,cid,taskid,status,size,bitrate,multipart,tag,monthly,type" >> "$NAME"
     echo "$NAME" > FILENAME_VAR.txt
     mkdir -p backup
 fi
@@ -69,20 +70,20 @@ for i in "${!idList[@]}"; do
     elif [[ $isMonthly == "false" ]]; then
         if [[ $MONTHLY_ONLY_BOOL == "true" ]]; then
             echo "id:${idList[i]} taskid:${TaskId} status:pass tag:${TAG:-None} Monthly:${isMonthly}"
-            echo "${idList[i]},,${TaskId},pass,,,,${TAG},${isMonthly}" >> "$fileName"
+            echo "${idList[i]},,${TaskId},pass,,,,${TAG},${isMonthly},${TYPE}" >> "$fileName"
             continue
         else
             sleepHandler
             startTime=$SECONDS
             ikoaOutput=$(./iKOA -E -d "$dirArgs" "$TYPE":"${idList[i]}" | tail)
-            FLAG=1         
+            FLAG=1
         fi
     else
         echo "id:${idList[i]} taskid:${TaskId} status:pass tag:${TAG:-None} Monthly:${isMonthly}"
-        echo "${idList[i]},,${TaskId},pass,,,,${TAG},${isMonthly}" >> "$fileName"
+        echo "${idList[i]},,${TaskId},pass,,,,${TAG},${isMonthly},${TYPE}" >> "$fileName"
         continue
     fi
-      
+
     if [[ $ikoaOutput =~ "已下载" ]]; then
         DownloadCount=$((DownloadCount + 1))
         bitrate=$(echo "$ikoaOutput" | grep -oE '[0-9]+kbps')
@@ -97,42 +98,50 @@ for i in "${!idList[@]}"; do
         filePath=$(find "$dirArgs" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -k1 -r -n | head -1 | cut -d ' ' -f2)
         cid=$(basename "$filePath")
         fileSize=$(du -m "$filePath" | cut -f1)
-        echo "${idList[i]},${cid},${TaskId},succeed,${fileSize}M,${bitrate},${multipart},${TAG},${isMonthly}" >> "$fileName"
-        echo "id:${idList[i]} cid:${cid} taskid:${TaskId} status:succeed size:${fileSize}M bitrate:${bitrate} multipart:${multipart} tag:${TAG:-None} Monthly:${isMonthly}"         
+        echo "${idList[i]},${cid},${TaskId},succeed,${fileSize}M,${bitrate},${multipart},${TAG},${isMonthly},${TYPE}" >> "$fileName"
+        echo "id:${idList[i]} cid:${cid} taskid:${TaskId} status:succeed size:${fileSize}M bitrate:${bitrate} multipart:${multipart} tag:${TAG:-None} Monthly:${isMonthly}"
     elif [[ $ikoaOutput =~ "序列码额度为0" ]]; then
         echo "序列码额度为0，不能下载!"
         break
     elif [[ $ikoaOutput =~ "查询无结果" ]]; then
-        echo "${idList[i]},,${TaskId},notfound,,,,${TAG},${isMonthly}" >> "$fileName"
+        echo "${idList[i]},,${TaskId},notfound,,,,${TAG},${isMonthly},${TYPE}" >> "$fileName"
         echo "id:${idList[i]} taskid:${TaskId} status:notfound tag:${TAG:-None} Monthly:${isMonthly}"
     else
         test $FLAG -eq 1 && codeQuota=$((codeQuota - 1))
-        echo "${idList[i]},,${TaskId},failed,,,,${TAG},${isMonthly}" >> "$fileName"
+        echo "${idList[i]},,${TaskId},failed,,,,${TAG},${isMonthly},${TYPE}" >> "$fileName"
         echo "id:${idList[i]} taskid:${TaskId} status:failed tag:${TAG:-None} Monthly:${isMonthly}"
     fi
     if [[ ($ikoaOutput =~ "已下载" && ($((DownloadCount % 4)) -eq 0 || $codeQuota -lt 45)) || $i -eq $((idListLen - 1)) ]]; then
         sleep 2
-        while true
-        do
-            rclone --config="$RcloneConf" move downloads "DRIVE:$RCLONE_DESTINATION" --drive-stop-on-upload-limit --drive-chunk-size 64M --exclude-from rclone-exclude-file.txt -v --stats-one-line --stats=1s
-            rc=$?
-            if [[ $rc -ne 7 ]]; then
-                break
-            else
-                if [[ $RcloneConf == "rclone_1.conf" ]]; then
-                    RcloneConf="rclone_2.conf"
+        if [[ $SYNCTYPE == "rclone" ]]; then
+            while true
+            do
+                rclone --config="$RcloneConf" move downloads "DRIVE:$RCLONE_DESTINATION" --drive-stop-on-upload-limit --drive-chunk-size 64M --exclude-from rclone-exclude-file.txt -v --stats-one-line --stats=1s
+                rc=$?
+                if [[ $rc -ne 7 ]]; then
+                    break
                 else
-                    RcloneConf="rclone_1.conf"
+                    if [[ $RcloneConf == "rclone_1.conf" ]]; then
+                        RcloneConf="rclone_2.conf"
+                    else
+                        RcloneConf="rclone_1.conf"
+                    fi
                 fi
+                sleep 10
+            done
+        elif [[ $SYNCTYPE == "gclone" ]]; then
+            gclone --config="/app/fanza/gclone.conf" move downloads "DRIVE:{${TEAM_DRIVE_ID}}${RCLONE_DESTINATION}" --drive-chunk-size 64M --exclude-from rclone-exclude-file.txt -v --stats-one-line --stats=1s
+            rc=$?
+            if [[ $rc -eq 0 ]]; then
+                break
             fi
-            sleep 10
-        done
+        fi
     fi
     if [[ $ikoaOutput =~ "查询无结果" ]]; then
         elapsed=0
     else
-        elapsed=$((SECONDS - startTime))  
-    fi  
+        elapsed=$((SECONDS - startTime))
+    fi
     echo "$elapsed" > TIME_VAR.txt
 done
 csvOutput=$(awk 'BEGIN {FS=","; OFS=":"; ORS=" "} NR > 1 { array[$4]++; number=number+1; total=total+$5; } END { printf "ID in all:%d ", number; for (i in array) print i,array[i]; total=total/1024; printf "totalDownload:%.1fG",total }' "$fileName")
@@ -143,12 +152,16 @@ if [[ -e $fileName && -d backup ]]; then
     cp "$fileName" backup
     if [[ $((TaskId + 1)) -eq $totalTask ]]; then
          echo "All ${totalTask} tasks finished ===>>> ${csvOutput} 序列码额度剩余 ${codeQuota} 次"
-         echo "Summary ===>>> ${csvOutput} 序列码额度剩余 ${codeQuota} 次 totalTask:${totalTask}" >>  "./backup/${fileName}"      
+         echo "Summary ===>>> ${csvOutput} 序列码额度剩余 ${codeQuota} 次 totalTask:${totalTask}" >>  "./backup/${fileName}"
     else
         echo "Until Now ===>>> ${csvOutput} 序列码额度剩余 ${codeQuota} 次"
-        sleep 3  
+        sleep 3
         echo "taskStatus ===>>> ${taskStatus}"
         echo "Until Now ===>>> ${csvOutput} 序列码额度剩余 ${codeQuota} 次 ${taskStatus}" >>  "./backup/${fileName}"
     fi
-    rclone --config="$RcloneConf" copy "./backup/${fileName}" "DRIVE:$LOG_PATH"                     
+    if [[ $SYNCTYPE == "rclone" ]]; then
+        rclone --config="$RcloneConf" copy "./backup/${fileName}" "DRIVE:$LOG_PATH"
+    elif [[ $SYNCTYPE == "gclone" ]]; then
+        gclone --config="/app/fanza/gclone.conf" copy "./backup/${fileName}" "DRIVE:{${TEAM_DRIVE_ID}}${LOG_PATH}"
+    fi
 fi

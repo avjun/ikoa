@@ -1,4 +1,11 @@
+FROM ubuntu:16.04 AS base
+RUN apt-get update && \
+    apt-get install -y wget && \
+    wget https://git.io/gclone.sh -O - | bash
+
+
 FROM i386/alpine:edge
+COPY --from=base . .
 
 ENV GLIB_VERSION=2.26-6 GLIB_ARCH=i686 PYTHONUNBUFFERED=1
 
@@ -16,7 +23,7 @@ RUN apk update && apk add --no-cache \
     findutils \
     grep  \
     tzdata \
-    python3 \   
+    python3 \
     py3-pip \
     bash \
     curl \
@@ -40,7 +47,7 @@ RUN apk update && apk add --no-cache \
     cp -a glibc-${GLIBC_VERSION}/usr /usr/glibc/ && \
     glibc-${GLIBC_VERSION}/usr/bin/ldconfig /usr/glibc/usr /usr/glibc/usr/lib && \
     ln -s /usr/glibc/usr/lib/ld-linux.so.2 /lib/ld-linux.so.2  && \
-    rm -Rf glibc-${GLIBC_VERSION} glibc-${GLIB_VERSION}-${GLIB_ARCH}.pkg.tar.xz && \ 
+    rm -Rf glibc-${GLIBC_VERSION} glibc-${GLIB_VERSION}-${GLIB_ARCH}.pkg.tar.xz && \
     cp /lib/libc.musl-x86.so.1 /usr/lib && \
     cp /lib/libz.so.1 /usr/lib && \
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \

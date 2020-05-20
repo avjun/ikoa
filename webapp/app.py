@@ -73,9 +73,10 @@ class LoginForm(FlaskForm):
 
 
 class DownloadForm(FlaskForm):
-    id_type = SelectField('id_type', choices=[('num', 'num'), ('cid', 'cid'), ('mgs', 'mgs')])
+    id_type = SelectField('id_type', choices=[('cid', 'cid'), ('num', 'num'), ('mgs', 'mgs'), ('pid', 'pid')])
     id_value = StringField('id_value', validators=[DataRequired()])
     id_tag = StringField('id_tag', validators=[Optional(), Regexp(r"^[\w]{1,10}$", message="Invalid tag!")])
+    sync_type = SelectField('sync_type', choices=[('rclone', 'rclone'), ('gclone', 'gclone')])
     submit = SubmitField('Submit')
 
     def validate_id_value(self, field):
@@ -134,12 +135,12 @@ def login():
     return render_template('login.html', form=form)
 
 
-def add_ts_task(id_value, id_type, id_tag):
+def add_ts_task(id_value, id_type, id_tag, sync_type):
     TASK.task_index += 1
     id_list = id_value.split(',')
     list_group = [id_list[n:n + 12] for n in range(0, len(id_list), 12)]
     for item in list_group:
-        cmd = 'ts bash task.sh {} {} {} {}'.format(','.join(item), id_type, TASK.task_id, id_tag)
+        cmd = 'ts bash task.sh {} {} {} {} {}'.format(','.join(item), id_type, TASK.task_id, id_tag, sync_type)
         os.system(cmd)
         TASK.task_queue.append(TASK.task_id)
         TASK.task_id += 1
@@ -157,7 +158,7 @@ def index():
 def postform():
     form = DownloadForm()
     if form.validate_on_submit():
-        add_ts_task(form.id_value.data, form.id_type.data, form.id_tag.data)
+        add_ts_task(form.id_value.data, form.id_type.data, form.id_tag.data, form.sync_type.data)
         if TASK.task_index == 1 or TASK.pushlog_finished is True:
             SOCKETIO.emit('message', {'data': 'ts started'}, namespace='/logging')
         return jsonify({'status': 'success', 'message': 'task added'})
