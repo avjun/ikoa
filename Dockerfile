@@ -50,8 +50,8 @@ RUN apk update && apk add --no-cache \
     rm -Rf glibc-${GLIBC_VERSION} glibc-${GLIB_VERSION}-${GLIB_ARCH}.pkg.tar.xz && \
     cp /lib/libc.musl-x86.so.1 /usr/lib && \
     cp /lib/libz.so.1 /usr/lib && \
-    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
-    echo "Asia/Shanghai" > /etc/timezone && \
+    # cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    # echo "Asia/Shanghai" > /etc/timezone && \
     apk del tar tzdata && \
     rm /bin/sh && ln -s /bin/bash /bin/sh
 
