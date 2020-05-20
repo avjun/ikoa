@@ -113,6 +113,22 @@ for i in "${!idList[@]}"; do
     fi
     if [[ ($ikoaOutput =~ "已下载" && ($((DownloadCount % 4)) -eq 0 || $codeQuota -lt 45)) || $i -eq $((idListLen - 1)) ]]; then
         sleep 2
+        if [[ $SYNCTYPE == "gclone" ]]; then
+            gclone --config="/app/fanza/gclone.conf" copy "DRIVE:$SAS_PATH" "/app/fanza/sas/" --include "*.json"
+            if [[ $(find "/app/fanza/sas/" -maxdepth 1 –name "*.json" -type f | wc -l) -gt 0 ]]; then
+                while true
+                do
+                    gclone --config="/app/fanza/gclone.conf" move downloads "DRIVE:{${TEAM_DRIVE_ID}}${RCLONE_DESTINATION}" --drive-chunk-size 64M --exclude-from rclone-exclude-file.txt -v --stats-one-line --stats=1s
+                    rc=$?
+                    if [[ $rc -eq 0 ]]; then
+                        break
+                    fi
+                    sleep 10
+                done
+            else
+                SYNCTYPE="rclone"
+            fi
+        fi
         if [[ $SYNCTYPE == "rclone" ]]; then
             while true
             do
@@ -126,17 +142,6 @@ for i in "${!idList[@]}"; do
                     else
                         RcloneConf="rclone_1.conf"
                     fi
-                fi
-                sleep 10
-            done
-        elif [[ $SYNCTYPE == "gclone" ]]; then
-            gclone --config="/app/fanza/gclone.conf" copy "DRIVE:$SAS_PATH" "/app/fanza/sas/" --include "*.json"
-            while true
-            do
-                gclone --config="/app/fanza/gclone.conf" move downloads "DRIVE:{${TEAM_DRIVE_ID}}${RCLONE_DESTINATION}" --drive-chunk-size 64M --exclude-from rclone-exclude-file.txt -v --stats-one-line --stats=1s
-                rc=$?
-                if [[ $rc -eq 0 ]]; then
-                    break
                 fi
                 sleep 10
             done
