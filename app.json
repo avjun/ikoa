@@ -46,6 +46,9 @@
         "MONTHLY_ONLY_BOOL": {
             "description": "Only download videos which belong to monthly, true or false",
             "value": "true"
+        },
+        "SAS_PATH": {
+            "description": "remote path for gclone to get sas, for exmaple: {team_drive_id}/folder, same format as https://github.com/donwa/gclone"
         }
 
     },

@@ -130,11 +130,16 @@ for i in "${!idList[@]}"; do
                 sleep 10
             done
         elif [[ $SYNCTYPE == "gclone" ]]; then
-            gclone --config="/app/fanza/gclone.conf" move downloads "DRIVE:{${TEAM_DRIVE_ID}}${RCLONE_DESTINATION}" --drive-chunk-size 64M --exclude-from rclone-exclude-file.txt -v --stats-one-line --stats=1s
-            rc=$?
-            if [[ $rc -eq 0 ]]; then
-                break
-            fi
+            gclone --config="/app/fanza/gclone.conf" copy "DRIVE:$SAS_PATH" "/app/fanza/sas/" --include "*.json"
+            while true
+            do
+                gclone --config="/app/fanza/gclone.conf" move downloads "DRIVE:{${TEAM_DRIVE_ID}}${RCLONE_DESTINATION}" --drive-chunk-size 64M --exclude-from rclone-exclude-file.txt -v --stats-one-line --stats=1s
+                rc=$?
+                if [[ $rc -eq 0 ]]; then
+                    break
+                fi
+                sleep 10
+            done
         fi
     fi
     if [[ $ikoaOutput =~ "查询无结果" ]]; then
