@@ -11,6 +11,7 @@
 * Forcing https.
 * Comprehensive download statistics data(csv format).
 * Customizing the admin account for logining in the web page.
+* Add gclone support
 
 ### Update:
 * You can choose to whether download monthly videos only(find the option in deploy page).  
@@ -46,6 +47,7 @@ Click the button below to deploy to heroku using your own heroku account.
 8. the format of mgs ID:"259LUXU-1200" or "259LUXU-1200,259LUXU-1201,259LUXU-1202 and more"(comma separated,case insensitive)  
 9. If you submit many IDs one time, you can put a tag on these IDs, so they can be downloaded under the same folder.(the tag length should be no more than 10 characters, be free to use chinese or japanese name or any other language)
 10. In theory, ikoa-web can upload no more than 1.5TB data to your google team drive per day.
+11. Add gclone support
 
 
 ### FAQ:
